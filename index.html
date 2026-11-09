@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tracy Point Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E6F0E9; --sheet:#F8FCF9; --grid-minor:#D3E4D8; --grid-major:#9EC2AA;
+  --axis:#1E3A2B; --ink:#16241C; --muted:#4B6656; --pen:#C8372D; --line:#2F6FB3;
+  --turtle:#2E8B57; --code-bg:#16241C; --code-ink:#E4F1E8; --code-num:#8FD6A8;
+  --border:#B7CFBF; --error:#B3261E;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0E1813; --sheet:#14211A; --grid-minor:#203329; --grid-major:#36573F;
+    --axis:#CFE6D7; --ink:#E4F1E8; --muted:#9DB8A6; --pen:#FF6B5E; --line:#73AAEA;
+    --turtle:#5CC98A; --code-bg:#08100B; --code-ink:#E4F1E8; --code-num:#8FD6A8;
+    --border:#2C4537; --error:#FF8A80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0E1813; --sheet:#14211A; --grid-minor:#203329; --grid-major:#36573F;
+  --axis:#CFE6D7; --ink:#E4F1E8; --muted:#9DB8A6; --pen:#FF6B5E; --line:#73AAEA;
+  --turtle:#5CC98A; --code-bg:#08100B; --code-ink:#E4F1E8; --code-num:#8FD6A8;
+  --border:#2C4537; --error:#FF8A80;
+  color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  line-height:1.5; font-size:1rem;
+}
+.wrap{max-width:1100px;margin:0 auto;padding:clamp(16px,3vw,32px)}
+header h1{font-size:clamp(1.7rem,3.6vw,2.4rem);line-height:1.15;margin:0 0 .35rem;letter-spacing:-0.01em}
+header p{margin:0;color:var(--muted);max-width:62ch}
+.layout{
+  display:grid; grid-template-columns:minmax(0,560px) minmax(0,1fr);
+  gap:clamp(18px,3vw,36px); margin-top:24px; align-items:start;
+}
+@media (max-width:860px){.layout{grid-template-columns:1fr}}
+.board{min-width:0}
+canvas{
+  width:100%; aspect-ratio:1/1; display:block; background:var(--sheet);
+  border:2px solid var(--axis); border-radius:6px; cursor:crosshair; touch-action:none;
+}
+canvas:focus-visible{outline:3px solid var(--line);outline-offset:3px}
+.caption{margin:.6rem 0 0;color:var(--muted);font-size:.92rem}
+.readout{
+  font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  font-size:clamp(1.15rem,2.4vw,1.55rem); font-weight:600;
+  background:var(--code-bg); color:var(--code-ink);
+  padding:16px 18px; border-radius:6px; margin:0 0 6px; overflow-x:auto; white-space:nowrap;
+}
+.readout .num{color:var(--code-num)}
+.readout.idle{color:var(--muted);font-family:inherit;font-weight:400;font-size:1.05rem}
+.hint{margin:0 0 22px;color:var(--muted);font-size:.92rem}
+.panel h2{font-size:1.05rem;margin:0 0 .5rem}
+.section{padding:16px 0;border-top:1px solid var(--border)}
+.section:first-of-type{border-top:0;padding-top:0}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+fieldset{border:0;margin:0;padding:0}
+legend{font-weight:700;margin-bottom:.4rem;padding:0}
+.seg{display:inline-flex;border:2px solid var(--axis);border-radius:6px;overflow:hidden}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{padding:.4rem .8rem;cursor:pointer;font-weight:700;color:var(--ink);background:var(--sheet)}
+.seg label + input + label{border-left:2px solid var(--axis)}
+.seg input:checked + label{background:var(--axis);color:var(--sheet)}
+.seg input:focus-visible + label{outline:3px solid var(--line);outline-offset:-3px}
+select,input[type=number]{
+  font:inherit; color:var(--ink); background:var(--sheet);
+  border:2px solid var(--border); border-radius:6px; padding:.35rem .5rem;
+}
+input[type=number]{width:7ch}
+select:focus-visible,input:focus-visible{outline:3px solid var(--line);outline-offset:1px;border-color:var(--line)}
+.check{display:inline-flex;gap:.45rem;align-items:center;cursor:pointer}
+.check input{width:1.1rem;height:1.1rem;accent-color:var(--turtle)}
+.btn{
+  font:inherit; font-weight:700; padding:.45rem .9rem; border-radius:6px; cursor:pointer;
+  border:2px solid var(--axis); background:var(--sheet); color:var(--ink);
+}
+.btn.primary{background:var(--axis);color:var(--sheet)}
+.btn:focus-visible{outline:3px solid var(--line);outline-offset:2px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.error{color:var(--error);margin:.4rem 0 0;font-size:.92rem;min-height:1.2em}
+ol.points{margin:0;padding:0;list-style:none;max-height:220px;overflow:auto}
+ol.points li{
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:.3rem 0;border-bottom:1px dashed var(--border);
+}
+ol.points .tag{display:inline-grid;place-items:center;min-width:1.7rem;height:1.7rem;border-radius:50%;background:var(--pen);color:#fff;font-weight:700;font-size:.85rem;margin-right:.6rem}
+ol.points .xy{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
+.remove{font:inherit;background:none;border:0;color:var(--muted);cursor:pointer;padding:.2rem .4rem;border-radius:4px}
+.remove:hover{color:var(--pen)}
+.remove:focus-visible{outline:3px solid var(--line)}
+.empty{color:var(--muted);margin:0}
+.code-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:.5rem}
+.code-head h2{margin:0}
+pre{
+  margin:0; background:var(--code-bg); color:var(--code-ink); padding:14px 16px; border-radius:6px;
+  overflow:auto; max-height:340px; font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace; font-size:.9rem; line-height:1.55;
+}
+.status{color:var(--turtle);font-weight:700;font-size:.92rem;min-width:5ch}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Tracy Point Finder</h1>
+    <p>Move over the grid to see the exact coordinates Tracy uses. Click to save a point, then copy the code into CodeHS.</p>
+  </header>
+
+  <div class="layout">
+    <div class="board">
+      <canvas id="plane" tabindex="0" aria-label="Tracy’s 400 by 400 canvas. Use arrow keys to move, Enter to save a point."></canvas>
+      <p class="caption">The canvas runs from −200 to 200 in both directions. Tracy starts at (0, 0) facing right, shown by the green arrow. Keyboard: arrow keys move, Enter saves.</p>
+    </div>
+
+    <div class="panel">
+      <div id="readout" class="readout idle" aria-live="polite">Point at the grid to see coordinates</div>
+      <p class="hint">This is the line you would type to send Tracy to that spot.</p>
+
+      <div class="section">
+        <div class="row" style="gap:24px;align-items:flex-start">
+          <fieldset>
+            <legend>What are you making?</legend>
+            <div class="seg" role="radiogroup">
+              <input type="radio" name="mode" id="mode-start" value="start">
+              <label for="mode-start">Starting points</label>
+              <input type="radio" name="mode" id="mode-path" value="path">
+              <label for="mode-path">Connect the dots</label>
+            </div>
+          </fieldset>
+          <div>
+            <label for="snap" style="font-weight:700;display:block;margin-bottom:.4rem">Snap to</label>
+            <select id="snap">
+              <option value="1">Every 1 (no snap)</option>
+              <option value="5">Every 5</option>
+              <option value="10">Every 10</option>
+              <option value="25">Every 25</option>
+              <option value="50">Every 50</option>
+            </select>
+          </div>
+        </div>
+        <label class="check" id="close-wrap" style="margin-top:12px">
+          <input type="checkbox" id="close-shape"> Close the shape (go back to point 1)
+        </label>
+      </div>
+
+      <div class="section">
+        <h2>Type a point</h2>
+        <div class="row">
+          <label for="in-x">x</label><input type="number" id="in-x" min="-200" max="200" step="1">
+          <label for="in-y">y</label><input type="number" id="in-y" min="-200" max="200" step="1">
+          <button class="btn" id="add-btn">Add point</button>
+        </div>
+        <p class="error" id="add-error" aria-live="polite"></p>
+      </div>
+
+      <div class="section">
+        <div class="code-head">
+          <h2>Saved points</h2>
+          <div class="row">
+            <button class="btn" id="undo-btn">Undo</button>
+            <button class="btn" id="clear-btn">Clear all</button>
+          </div>
+        </div>
+        <ol class="points" id="points"></ol>
+      </div>
+
+      <div class="section">
+        <div class="code-head">
+          <h2>Code for CodeHS</h2>
+          <div class="row">
+            <span class="status" id="copy-status" aria-live="polite"></span>
+            <button class="btn primary" id="copy-btn">Copy code</button>
+          </div>
+        </div>
+        <pre id="code"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var canvas = document.getElementById('plane');
+  var ctx = canvas.getContext('2d');
+  var readout = document.getElementById('readout');
+  var pointsEl = document.getElementById('points');
+  var codeEl = document.getElementById('code');
+  var snapEl = document.getElementById('snap');
+  var closeEl = document.getElementById('close-shape');
+  var closeWrap = document.getElementById('close-wrap');
+  var STORE = 'tracy-point-finder-v1';
+
+  var points = [];
+  var hover = null;
+  var snap = 10;
+  var mode = 'start';
+  var closeShape = false;
+  var k = 1, dpr = 1;
+
+  function load(){
+    try{
+      var s = JSON.parse(localStorage.getItem(STORE) || 'null');
+      if(s){
+        if(Array.isArray(s.points)){
+          points = s.points.filter(function(p){ return p && isFinite(p.x) && isFinite(p.y); });
+        }
+        if([1,5,10,25,50].indexOf(s.snap) !== -1) snap = s.snap;
+        mode = s.mode === 'path' ? 'path' : 'start';
+        closeShape = !!s.closeShape;
+      }
+    }catch(e){}
+  }
+  function save(){
+    try{ localStorage.setItem(STORE, JSON.stringify({points:points, snap:snap, mode:mode, closeShape:closeShape})); }catch(e){}
+  }
+
+  function css(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function clamp(v){ return Math.max(-200, Math.min(200, v)); }
+  function snapVal(v){ var r = Math.round(v / snap) * snap; r = clamp(r); return r || 0; }
+  function sx(x){ return x + 200; }
+  function sy(y){ return 200 - y; }
+
+  function resize(){
+    dpr = window.devicePixelRatio || 1;
+    var w = canvas.clientWidth;
+    if(!w) return;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(w * dpr);
+    k = canvas.width / 400;
+    draw();
+  }
+
+  function draw(){
+    var c = {
+      sheet:css('--sheet'), minor:css('--grid-minor'), major:css('--grid-major'),
+      axis:css('--axis'), muted:css('--muted'), ink:css('--ink'), pen:css('--pen'),
+      line:css('--line'), turtle:css('--turtle')
+    };
+    var px = dpr / k;
+    ctx.setTransform(k,0,0,k,0,0);
+    ctx.fillStyle = c.sheet;
+    ctx.fillRect(0,0,400,400);
+
+    // grid
+    ctx.lineWidth = px;
+    for(var i = 0; i <= 400; i += 10){
+      ctx.strokeStyle = (i % 50 === 0) ? c.major : c.minor;
+      ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,400); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(400,i); ctx.stroke();
+    }
+
+    // axes
+    ctx.strokeStyle = c.axis;
+    ctx.lineWidth = 2 * px;
+    ctx.beginPath(); ctx.moveTo(0,200); ctx.lineTo(400,200); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(200,0); ctx.lineTo(200,400); ctx.stroke();
+
+    // labels
+    ctx.fillStyle = c.muted;
+    ctx.font = (11 * px) + 'px "Atkinson Hyperlegible", system-ui, sans-serif';
+    for(var v = -150; v <= 150; v += 50){
+      if(v === 0) continue;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(String(v), sx(v), 200 + 4 * px);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(v), 200 + 5 * px, sy(v));
+    }
+
+    // path preview
+    if(mode === 'path' && points.length > 1){
+      ctx.strokeStyle = c.line;
+      ctx.lineWidth = 2.5 * px;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(sx(points[0].x), sy(points[0].y));
+      for(var j = 1; j < points.length; j++) ctx.lineTo(sx(points[j].x), sy(points[j].y));
+      if(closeShape && points.length > 2) ctx.closePath();
+      ctx.stroke();
+    }
+
+    // Tracy at origin
+    ctx.fillStyle = c.turtle;
+    ctx.beginPath();
+    ctx.moveTo(200 + 11 * px, 200);
+    ctx.lineTo(200 - 6 * px, 200 - 7 * px);
+    ctx.lineTo(200 - 6 * px, 200 + 7 * px);
+    ctx.closePath();
+    ctx.fill();
+
+    // saved points
+    ctx.font = 'bold ' + (11 * px) + 'px "Atkinson Hyperlegible", system-ui, sans-serif';
+    for(var n = 0; n < points.length; n++){
+      var p = points[n];
+      ctx.fillStyle = c.pen;
+      ctx.beginPath(); ctx.arc(sx(p.x), sy(p.y), 4.5 * px, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = c.ink;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      ctx.fillText(String(n + 1), sx(p.x) + 6 * px, sy(p.y) - 4 * px);
+    }
+
+    // hover crosshair
+    if(hover){
+      ctx.strokeStyle = c.line;
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = px;
+      ctx.setLineDash([4 * px, 4 * px]);
+      ctx.beginPath(); ctx.moveTo(sx(hover.x),0); ctx.lineTo(sx(hover.x),400); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,sy(hover.y)); ctx.lineTo(400,sy(hover.y)); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 2 * px;
+      ctx.beginPath(); ctx.arc(sx(hover.x), sy(hover.y), 7 * px, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+
+  function updateReadout(){
+    if(!hover){
+      readout.className = 'readout idle';
+      readout.textContent = 'Point at the grid to see coordinates';
+      return;
+    }
+    readout.className = 'readout';
+    readout.innerHTML = 'setposition(<span class="num">' + hover.x + '</span>, <span class="num">' + hover.y + '</span>)';
+  }
+
+  function buildCode(){
+    if(points.length === 0) return '# Click the grid to add points.\n# Your code will show up here.';
+    var out = [];
+    if(mode === 'start'){
+      points.forEach(function(p, i){
+        out.push('# Point ' + (i + 1));
+        out.push('penup()');
+        out.push('setposition(' + p.x + ', ' + p.y + ')');
+        out.push('pendown()');
+        out.push('');
+      });
+      out.pop();
+    } else {
+      out.push('# Move to the start without drawing');
+      out.push('penup()');
+      out.push('setposition(' + points[0].x + ', ' + points[0].y + ')');
+      out.push('pendown()');
+      if(points.length > 1){
+        out.push('');
+        out.push('# Draw to each point');
+        for(var i = 1; i < points.length; i++) out.push('setposition(' + points[i].x + ', ' + points[i].y + ')');
+        if(closeShape && points.length > 2) out.push('setposition(' + points[0].x + ', ' + points[0].y + ')  # back to start');
+      }
+    }
+    return out.join('\n');
+  }
+
+  function render(){
+    // list
+    pointsEl.innerHTML = '';
+    if(points.length === 0){
+      var li = document.createElement('li');
+      li.innerHTML = '<p class="empty">No points yet. Click the grid or type one above.</p>';
+      li.style.borderBottom = '0';
+      pointsEl.appendChild(li);
+    } else {
+      points.forEach(function(p, i){
+        var li = document.createElement('li');
+        var left = document.createElement('span');
+        left.innerHTML = '<span class="tag">' + (i + 1) + '</span><span class="xy">(' + p.x + ', ' + p.y + ')</span>';
+        var btn = document.createElement('button');
+        btn.className = 'remove';
+        btn.textContent = 'Remove';
+        btn.setAttribute('aria-label', 'Remove point ' + (i + 1));
+        btn.addEventListener('click', function(){ points.splice(i, 1); changed(); });
+        li.appendChild(left); li.appendChild(btn);
+        pointsEl.appendChild(li);
+      });
+    }
+    document.getElementById('undo-btn').disabled = points.length === 0;
+    document.getElementById('clear-btn').disabled = points.length === 0;
+    closeWrap.style.display = mode === 'path' ? 'inline-flex' : 'none';
+    codeEl.textContent = buildCode();
+    draw();
+  }
+
+  function changed(){ save(); render(); }
+
+  function addPoint(x, y){ points.push({x:x, y:y}); changed(); }
+
+  function toCoord(e){
+    var r = canvas.getBoundingClientRect();
+    var x = (e.clientX - r.left) / r.width * 400 - 200;
+    var y = 200 - (e.clientY - r.top) / r.height * 400;
+    return {x:snapVal(x), y:snapVal(y)};
+  }
+
+  canvas.addEventListener('pointermove', function(e){ hover = toCoord(e); updateReadout(); draw(); });
+  canvas.addEventListener('pointerdown', function(e){ hover = toCoord(e); updateReadout(); draw(); });
+  canvas.addEventListener('pointerleave', function(e){
+    if(e.pointerType === 'mouse'){ hover = null; updateReadout(); draw(); }
+  });
+  canvas.addEventListener('click', function(e){ var p = toCoord(e); hover = p; updateReadout(); addPoint(p.x, p.y); });
+
+  canvas.addEventListener('focus', function(){ if(!hover){ hover = {x:0, y:0}; updateReadout(); draw(); } });
+  canvas.addEventListener('keydown', function(e){
+    if(!hover) hover = {x:0, y:0};
+    var step = snap;
+    var handled = true;
+    if(e.key === 'ArrowLeft') hover.x = clamp(hover.x - step);
+    else if(e.key === 'ArrowRight') hover.x = clamp(hover.x + step);
+    else if(e.key === 'ArrowUp') hover.y = clamp(hover.y + step);
+    else if(e.key === 'ArrowDown') hover.y = clamp(hover.y - step);
+    else if(e.key === 'Enter' || e.key === ' ') addPoint(hover.x, hover.y);
+    else handled = false;
+    if(handled){ e.preventDefault(); updateReadout(); draw(); }
+  });
+
+  // controls
+  document.querySelectorAll('input[name=mode]').forEach(function(r){
+    r.addEventListener('change', function(){ mode = r.value; changed(); });
+  });
+  snapEl.addEventListener('change', function(){ snap = parseInt(snapEl.value, 10) || 1; save(); });
+  closeEl.addEventListener('change', function(){ closeShape = closeEl.checked; changed(); });
+
+  document.getElementById('add-btn').addEventListener('click', function(){
+    var xs = document.getElementById('in-x').value, ys = document.getElementById('in-y').value;
+    var err = document.getElementById('add-error');
+    var x = Number(xs), y = Number(ys);
+    if(xs === '' || ys === '' || !isFinite(x) || !isFinite(y) || x < -200 || x > 200 || y < -200 || y > 200){
+      err.textContent = 'Enter x and y between −200 and 200.';
+      return;
+    }
+    err.textContent = '';
+    addPoint(Math.round(x), Math.round(y));
+  });
+  ['in-x','in-y'].forEach(function(id){
+    document.getElementById(id).addEventListener('keydown', function(e){
+      if(e.key === 'Enter') document.getElementById('add-btn').click();
+    });
+  });
+
+  document.getElementById('undo-btn').addEventListener('click', function(){ points.pop(); changed(); });
+  document.getElementById('clear-btn').addEventListener('click', function(){ points = []; changed(); });
+
+  document.getElementById('copy-btn').addEventListener('click', function(){
+    var text = codeEl.textContent;
+    var status = document.getElementById('copy-status');
+    function done(){ status.textContent = 'Copied'; setTimeout(function(){ status.textContent = ''; }, 1600); }
+    function fallback(){
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly',''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try{ document.execCommand('copy'); done(); }catch(e){ status.textContent = 'Select the code and copy it'; }
+      document.body.removeChild(ta);
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else fallback();
+  });
+
+  // theme changes
+  try{ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw); }catch(e){}
+  new MutationObserver(draw).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+
+  // init
+  load();
+  snapEl.value = String(snap);
+  document.getElementById(mode === 'path' ? 'mode-path' : 'mode-start').checked = true;
+  closeEl.checked = closeShape;
+  if(window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
+  window.addEventListener('resize', resize);
+  resize();
+  render();
+})();
+</script>
+</body>
+</html>
